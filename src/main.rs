@@ -30,7 +30,7 @@ struct Args {
     #[arg(long, default_value = "t_types_test")]
     table: String,
 
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 100)]
     count: u32,
 
     #[arg(short, long, default_value_t = 1)]
@@ -76,12 +76,12 @@ async fn main() -> Result<()> {
     let table = args.table;
     let count = args.count;
     let count = args.count;
-    let current_time = SystemTime::now()
+    let begin = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_millis();
 
-    println!("host={}, port={}, user={}, database={}, table={}, count={}, begin={}", host, port, user, database, table, count, current_time);
+    println!("host={}, port={}, user={}, database={}, table={}, count={}, begin={}", host, port, user, database, table, count, begin);
 
     let url = format!(
         "mysql://{}:{}@{}:{}/{}",
@@ -147,6 +147,12 @@ async fn main() -> Result<()> {
             .await?;
     }
 
+
+    let end = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
+    println!("\n===== Insert start_at={}, end_at={}, cost={}", begin, end, end - begin);
 
     Ok(())
 }
