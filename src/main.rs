@@ -30,7 +30,7 @@ struct Args {
     #[arg(long, default_value = "t_types_test")]
     table: String,
 
-    #[arg(short, long, default_value_t = 100)]
+    #[arg(short, long, default_value_t = 1)]
     count: u32,
 
     #[arg(short, long, default_value_t = 1)]
@@ -152,7 +152,7 @@ async fn main() -> Result<()> {
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_millis();
-    println!("\n===== Insert start_at={}, end_at={}, cost={}", begin, end, end - begin);
+    println!("\n===== Insert start_at={}, end_at={}, count={}, cost={}s", begin, end, count, (end - begin) / 1000);
 
     Ok(())
 }
