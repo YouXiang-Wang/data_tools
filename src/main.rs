@@ -92,6 +92,7 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 async fn main() -> Result<()> {
     let args = Args::parse();
     let action = &args.action;
+    println!("{} {}Resolving args...", style("[1/4]").bold().dim(), LOOKING_GLASS);
     match action.as_str() {
         "insert" => {
             let future = insert_into(&args);
@@ -134,6 +135,7 @@ async fn insert_into(args: &Args) -> Result<()> {
 
     let begin = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
     let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port , database);
+    println!("{} {}Building database connections...", style("[2/4]").bold().dim(), TRUCK);
     let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
 
     match table.as_str() {
@@ -145,8 +147,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                // let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}").unwrap().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
                 let bar = ProgressBar::new(count as u64);
                 //bar.set_style(spinner_style.clone());
-                println!("{} {}Resolving packages...", style("[1/4]").bold().dim(), LOOKING_GLASS);
-                println!("{} {}Fetching packages...", style("[2/4]").bold().dim(), TRUCK);
+
 
                 println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
 
@@ -237,7 +238,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                 );
 
 
-                println!("{} Done in {}", SPARKLE, message);
+                println!("{} {} in {}", style("[Done]").bold().dim(), SPARKLE, message);
                 Ok(())
             }
         },
