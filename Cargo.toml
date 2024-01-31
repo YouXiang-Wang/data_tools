@@ -11,6 +11,7 @@ anyhow = "1"
 clap = { version = "4.4.11", features = ["derive"] }
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "serde"] }
 uuid = { version = "1.0", features = ["v4"] }
+indicatif = "0.16.2"
 
 [dependencies.sqlx]
 version = "0.6"
