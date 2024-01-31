@@ -194,7 +194,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                     match _res {
                         Ok(r) => {},
                         Err(e) => {
-                            println!("Error in insert table={}, sql={}", table, sql);
+                            println!("Error {} while insert table={}, sql={}", e.as_database_error().unwrap().to_string() ,table, sql);
                         }
                     }
                     let _end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
