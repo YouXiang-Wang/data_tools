@@ -162,7 +162,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                         builder.push(", ");
                         builder.push_bind(0.9999);
                         builder.push(", ");
-                        builder.push_bind("'3333.50");
+                        builder.push_bind("3333.50");
                         builder.push(", ");
                         builder.push_bind(2023);
                         builder.push(", ");
