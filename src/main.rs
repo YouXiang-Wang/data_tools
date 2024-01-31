@@ -229,12 +229,15 @@ async fn insert_into(args: &Args) -> Result<()> {
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                 let message = format!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 bar.finish_and_clear();
-                println!("{}", message);
+                //println!("{}", message);
                 println!(
                     "{} {}Building fresh packages...",
                     style("[4/4]").bold().dim(),
                     PAPER
                 );
+
+
+                println!("{} Done in {}", SPARKLE, message);
                 Ok(())
             }
         },
