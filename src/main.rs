@@ -8,15 +8,14 @@ use clap::Parser;
 use sqlx::{Execute, MySql, MySqlPool, Pool};
 use uuid::Uuid;
 use std::time::{SystemTime, UNIX_EPOCH};
-
+use console::{style, Emoji};
 use std::thread::sleep;
 use std::time::Duration;
 
 use sqlx::QueryBuilder;
 use tokio;
 
-use indicatif::ProgressBar;
-
+use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 /// Simple program to delete records in rocket.messages
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -80,6 +79,15 @@ struct AllTypesTest {
     text1: Option<String>,
     long_text: Option<String>
 }
+
+
+static TRUCK: Emoji<'_, '_> = Emoji("🚚  ", "");
+static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "");
+
+static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "");
+static PAPER: Emoji<'_, '_> = Emoji("📃  ", "");
+static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -133,12 +141,19 @@ async fn insert_into(args: &Args) -> Result<()> {
             if(count == 0 || batch == 0) {
                 Ok(())
             } else {
-
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
+               // let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}").unwrap().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
                 let bar = ProgressBar::new(count as u64);
+                //bar.set_style(spinner_style.clone());
+                println!("{} {}Resolving packages...", style("[1/4]").bold().dim(), LOOKING_GLASS);
+                println!("{} {}Fetching packages...", style("[2/4]").bold().dim(), TRUCK);
+
+                println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
+
                 for i in 0..round {
                     let mut builder = QueryBuilder::new("INSERT INTO t_types_test(id1, id2, id3, gender, bool_1, bit_1, int_tiny, int_small, int_medium, int_int, int_big, pay1, pay2, pay3, latest_year, latest_date, latest_time, latest_datetime, latest_timestamp, blob_tiny, blob_blob, blob_medium, text1, long_text) VALUES ");
                     let _begin = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
+                    bar.set_prefix(format!("[{}/?]", i + 1));
                     for i in 0.._batch {
                         let id = Uuid::new_v4().to_string();
                         builder.push("(");
@@ -213,9 +228,13 @@ async fn insert_into(args: &Args) -> Result<()> {
 
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                 let message = format!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
-                //println!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 bar.finish_and_clear();
                 println!("{}", message);
+                println!(
+                    "{} {}Building fresh packages...",
+                    style("[4/4]").bold().dim(),
+                    PAPER
+                );
                 Ok(())
             }
         },
