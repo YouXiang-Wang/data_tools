@@ -135,12 +135,11 @@ async fn insert_into(args: &Args) -> Result<()> {
             } else {
 
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
-                let bar = ProgressBar::new(round as u64);
+                let bar = ProgressBar::new(count as u64);
                 for i in 0..round {
-                    bar.inc(1);
                     let mut builder = QueryBuilder::new("INSERT INTO t_types_test(id1, id2, id3, gender, bool_1, bit_1, int_tiny, int_small, int_medium, int_int, int_big, pay1, pay2, pay3, latest_year, latest_date, latest_time, latest_datetime, latest_timestamp, blob_tiny, blob_blob, blob_medium, text1, long_text) VALUES ");
                     let _begin = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
-                    for i in 0..batch {
+                    for i in 0.._batch {
                         let id = Uuid::new_v4().to_string();
                         builder.push("(");
                         builder.push_bind(id);
@@ -209,12 +208,12 @@ async fn insert_into(args: &Args) -> Result<()> {
                     if(rate > 0 && _t > 0) {
                         tokio::time::sleep(tokio::time::Duration::from_millis(_t as u64)).await;
                     }
+                    bar.inc(_batch as u64);
                 }
 
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
-                //println!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
-
                 let message = format!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
+                println!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 bar.finish_with_message(message);
                 Ok(())
             }
