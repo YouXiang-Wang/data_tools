@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -40,13 +41,13 @@ struct Args {
     #[arg(long, default_value = "t_types_test")]
     table: String,
 
-    #[arg(short, long, default_value_t = 10000)]
+    #[arg(short, long, default_value_t = 1)]
     count: u32,
 
-    #[arg(short, long, default_value_t = 10)]
+    #[arg(short, long, default_value_t = 1)]
     batch: u32,
 
-    #[arg(long, default_value_t = 1000)]
+    #[arg(long, default_value_t = -1)]
     rate: i32
 }
 
@@ -161,7 +162,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                         builder.push(", ");
                         builder.push_bind(0.9999);
                         builder.push(", ");
-                        builder.push_bind("3333.50");
+                        builder.push_bind("'3333.50");
                         builder.push(", ");
                         builder.push_bind(2023);
                         builder.push(", ");
@@ -188,13 +189,21 @@ async fn insert_into(args: &Args) -> Result<()> {
                         }
                     }
                     let query = builder.build();
-                    query.execute(&pool).await?;
+                    let sql = query.sql();
+                    let _res = query.execute(&pool).await;
+                    match _res {
+                        Ok(r) => {},
+                        Err(e) => {
+                            println!("Error in insert table={}, sql={}", table, sql);
+                        }
+                    }
                     let _end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                     let _t = 1000 - (_end - _begin);
                     if(rate > 0 && _t > 0) {
                         tokio::time::sleep(tokio::time::Duration::from_millis(_t as u64)).await;
                     }
                 }
+
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                 println!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 Ok(())
