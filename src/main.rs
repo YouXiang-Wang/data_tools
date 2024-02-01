@@ -9,11 +9,14 @@ use sqlx::{Execute, MySql, MySqlPool, Pool};
 use uuid::Uuid;
 use std::time::{SystemTime, UNIX_EPOCH};
 use console::{style, Emoji};
+use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 
 use sqlx::QueryBuilder;
 use tokio;
+
+
 
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 /// Simple program to delete records in rocket.messages
@@ -42,10 +45,10 @@ struct Args {
     #[arg(long, default_value = "t_types_test")]
     table: String,
 
-    #[arg(short, long, default_value_t = 100)]
+    #[arg(short, long, default_value_t = 1)]
     count: u32,
 
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 2)]
     batch: u32,
 
     #[arg(long, default_value_t = -1)]
@@ -135,7 +138,7 @@ async fn insert_into(args: &Args) -> Result<()> {
 
     let begin = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
     let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port , database);
-    println!("{} {}Building database connections...", style("[2/4]").bold().dim(), TRUCK);
+    println!("{} {}Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), TRUCK, host, port, database, user, table);
     let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
 
     match table.as_str() {
@@ -146,7 +149,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
                 //let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}").unwrap().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
                 let spinner_style = ProgressStyle::default_bar();
-
+                spinner_style.enable_steady_tick(Duration::from_millis(100));
                 let bar = ProgressBar::new(count as u64);
                 bar.set_style(spinner_style.clone());
 
@@ -208,7 +211,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                         builder.push(", ");
                         builder.push_bind("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
                         builder.push(")");
-                        if i < batch - 1 {
+                        if i < _batch - 1 {
                             builder.push(", ");
                         }
                     }
@@ -218,7 +221,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                     match _res {
                         Ok(r) => {},
                         Err(e) => {
-                            println!("Error {} while insert table={}, sql={}", e.as_database_error().unwrap().to_string() ,table, sql);
+                            println!("Error {} while insert table={}, sql=[{}]", e.as_database_error().unwrap().to_string(), table, sql);
                         }
                     }
                     let _end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
@@ -230,9 +233,8 @@ async fn insert_into(args: &Args) -> Result<()> {
                 }
 
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
-                let message = format!("action={}, host={}, port={}, user={}, database={}, table={}, count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", action, host, port, user, database, table, count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
+                let message = format!("count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 bar.finish_and_clear();
-                //println!("{}", message);
                 println!(
                     "{} {}Building fresh packages...",
                     style("[4/4]").bold().dim(),
