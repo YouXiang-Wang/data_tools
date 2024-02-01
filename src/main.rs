@@ -190,7 +190,7 @@ async fn insert_into(args: &Args) -> Result<()> {
 
                 println!(
                     "{} {}Retrieving current count: {}",
-                    style("[4/4]").bold().dim(),
+                    style("[3/4]").bold().dim(),
                     PAPER,
                     current_tbl_count
                 );
@@ -218,7 +218,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                         .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", "red"))
                         .progress_chars("█  "),
                 );
-                println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
+                println!("{} {}Inserting...", style("[4/4]").bold().dim(), CLIP);
 
                 for i in 0..round {
                     let mut builder = QueryBuilder::new("INSERT INTO t_types_test(id1, id2, id3, gender, bool_1, bit_1, int_tiny, int_small, int_medium, int_int, int_big, pay1, pay2, pay3, latest_year, latest_date, latest_time, latest_datetime, latest_timestamp, blob_tiny, blob_blob, blob_medium, text1, long_text) VALUES ");
