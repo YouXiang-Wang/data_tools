@@ -172,6 +172,9 @@ async fn insert_into(args: &Args) -> Result<()> {
             pb.finish_with_message("100%");
         });
     }
+
+    //m.join().unwrap();
+
     match table.as_str() {
         "t_types_test" => {
             if(count == 0 || batch == 0) {
@@ -217,6 +220,11 @@ async fn insert_into(args: &Args) -> Result<()> {
 
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
                 let bar = ProgressBar::new(count as u64);
+                bar.set_style(
+                    ProgressStyle::default_bar()
+                        .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", "█  "))
+                        .progress_chars("Inserting"),
+                );
                 println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
 
                 for i in 0..round {
