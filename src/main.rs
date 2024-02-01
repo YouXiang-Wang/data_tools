@@ -205,25 +205,13 @@ async fn insert_into(args: &Args) -> Result<()> {
                     }
                 });
 
-                /*
-                let handle = task::spawn(async move {
-                    loop {
-                        match get_table_count(&pool_clone, &table).await {
-                            Ok(count) => println!("Current count: {}", count),
-                            Err(e) => eprintln!("Error querying table count: {}", e),
-                        }
-                        time::sleep(Duration::from_secs(5)).await;
-                    }
-                });
-
-                 */
 
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
                 let bar = ProgressBar::new(count as u64);
                 bar.set_style(
                     ProgressStyle::default_bar()
-                        .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", "█  "))
-                        .progress_chars("Inserting"),
+                        .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", "red"))
+                        .progress_chars("█  "),
                 );
                 println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
 
