@@ -12,11 +12,11 @@ use console::{style, Emoji};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-
+use std::error::Error;
 use sqlx::QueryBuilder;
 use tokio;
 
-
+use tokio::{task, time};
 
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 /// Simple program to delete records in rocket.messages
@@ -109,7 +109,11 @@ async fn main() -> Result<()> {
 
         }
     }
-    Ok(())
+    //Ok(())
+
+    loop {
+        sleep(Duration::from_secs(3600));
+    }
 }
 
 
@@ -146,14 +150,46 @@ async fn insert_into(args: &Args) -> Result<()> {
             if(count == 0 || batch == 0) {
                 Ok(())
             } else {
+                let current_tbl_count = match get_table_count(&pool, table).await {
+                    Ok(count) => count,
+                    Err(e) => {
+                        eprintln!("Error querying table count: {}", e);
+                        1
+                    }
+                };
+
+                println!("current_tbl_count = {}", current_tbl_count);
+
+                let should_final_count = current_tbl_count + count as i64;
+
+                let pool_clone = pool.clone();
+                let table_clone = table.clone();
+
+                tokio::spawn(async move {
+                    loop {
+                        match get_table_count(&pool_clone, &table_clone).await {
+                            Ok(count) => println!("Current count: {}", count),
+                            Err(e) => eprintln!("Error querying table count: {}", e),
+                        }
+                        sleep(Duration::from_secs(5));
+                    }
+                });
+
+                /*
+                let handle = task::spawn(async move {
+                    loop {
+                        match get_table_count(&pool_clone, &table).await {
+                            Ok(count) => println!("Current count: {}", count),
+                            Err(e) => eprintln!("Error querying table count: {}", e),
+                        }
+                        time::sleep(Duration::from_secs(5)).await;
+                    }
+                });
+
+                 */
+
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
-                //let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}").unwrap().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
-                let spinner_style = ProgressStyle::default_bar();
-                spinner_style.enable_steady_tick(Duration::from_millis(100));
                 let bar = ProgressBar::new(count as u64);
-                bar.set_style(spinner_style.clone());
-
-
                 println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
 
                 for i in 0..round {
@@ -255,6 +291,11 @@ async fn insert_into(args: &Args) -> Result<()> {
 
 }
 
+async fn get_table_count(pool: &Pool<MySql>, table_name: &str) -> Result<i64, sqlx::Error> {
+    let query = format!("SELECT COUNT(*) FROM {}", table_name);
+    let count: i64 = sqlx::query_scalar(&query).fetch_one(pool).await?;
+    Ok(count)
+}
 fn load_dir(dir: &str) -> Result<Vec<String>> {
     let mut files = Vec::new();
     for entry in fs::read_dir(dir)? {
@@ -311,7 +352,7 @@ async fn execute_batch_insert(id_file: &str, pool: &Pool<MySql>) -> Result<()> {
 
 
 #[tokio::main]
-async fn main1() -> Result<()> {
+async fn main2() -> Result<()> {
     let v1 = test();
     let v2 =  test();
     println!("main");
@@ -324,4 +365,12 @@ async fn test() -> Result<()> {
     println!("Hello world!");
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     Ok(())
+}
+
+
+#[tokio::main]
+async fn main3() {
+    loop {
+        sleep(Duration::from_secs(3600));
+    }
 }
