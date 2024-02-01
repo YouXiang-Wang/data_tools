@@ -144,9 +144,11 @@ async fn insert_into(args: &Args) -> Result<()> {
                 Ok(())
             } else {
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
-               // let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}").unwrap().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
+                //let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}").unwrap().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
+                let spinner_style = ProgressStyle::default_bar();
+
                 let bar = ProgressBar::new(count as u64);
-                //bar.set_style(spinner_style.clone());
+                bar.set_style(spinner_style.clone());
 
 
                 println!("{} {}Linking dependencies...", style("[3/4]").bold().dim(), CLIP);
