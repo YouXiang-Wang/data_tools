@@ -171,7 +171,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                             Ok(count) => println!("Current count: {}", count),
                             Err(e) => eprintln!("Error querying table count: {}", e),
                         }
-                        sleep(Duration::from_secs(5));
+                        sleep(Duration::from_secs(1));
                     }
                 });
 
