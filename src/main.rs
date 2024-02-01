@@ -188,7 +188,12 @@ async fn insert_into(args: &Args) -> Result<()> {
                     }
                 };
 
-                println!("current_tbl_count = {}", current_tbl_count);
+                println!(
+                    "{} {}Retrieving current count: {}",
+                    style("[4/4]").bold().dim(),
+                    PAPER,
+                    current_tbl_count
+                );
 
                 let should_final_count = current_tbl_count + count as i64;
 
@@ -294,11 +299,6 @@ async fn insert_into(args: &Args) -> Result<()> {
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                 let message = format!("count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 bar.finish_and_clear();
-                println!(
-                    "{} {}Building fresh packages...",
-                    style("[4/4]").bold().dim(),
-                    PAPER
-                );
 
 
                 println!("{} {} in {}", style("[Done]").bold().dim(), SPARKLE, message);
