@@ -111,8 +111,10 @@ async fn main() -> Result<()> {
     let pool_for_insert = pool.clone();
     let pool_for_count = pool.clone();
 
-    let current_tbl_count = get_table_count(&pool_for_count, "t_types_test").await?;
-    let should_final_count = current_tbl_count + count as i64;
+
+    //let current_tbl_count = get_table_count(&pool_for_count, "t_types_test").await?;
+    //let should_final_count = current_tbl_count + count as i64;
+
 
     let insert_thread = tokio::spawn(async move {
         insert_into(&args, &pool_for_insert).await;
@@ -132,8 +134,6 @@ async fn main() -> Result<()> {
      */
 
 
-
-
     let styles = [
         ("Rough bar:", "█  ", "red"),
         ("Fine bar: ", "█▉▊▋▌▍▎▏  ", "yellow"),
@@ -144,44 +144,11 @@ async fn main() -> Result<()> {
 
     let m = MultiProgress::new();
 
-    for s in styles.iter() {
-        let pb = m.add(ProgressBar::new(512));
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", s.2))
-                .progress_chars(s.1),
-        );
-        pb.set_prefix(s.0);
-        /*
-        let wait = Duration::from_millis(thread_rng().gen_range(10..30));
-        thread::spawn(move || {
-            for i in 0..512 {
-                pb.inc(1);
-                pb.set_message(format!("{:3}%", 100 * i / 512));
-                thread::sleep(wait);
-            }
-            pb.finish_with_message("100%");
-        });
-
-         */
-
-        loop {
-            match get_table_count(&pool_for_count, "t_types_test").await {
-                Ok(count) => {
-                    println!("Current count of table t_types_test: {}", count);
-                    pb.inc(1);
-                    //pb.set_message(format!("{:3}%", 100 * i / 512)),
-                }
-                Err(e) => eprintln!("Error querying table count: {}", e),
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    }
     insert_thread.await.unwrap();
     //count_thread.await.unwrap();
 
 
-    m.join().unwrap();
+    //m.join().unwrap();
 
 
 
@@ -205,13 +172,7 @@ async fn main() -> Result<()> {
 }
 
 async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
-    let action = &args.action;
     let table = &args.table;
-    let host = &args.host;
-    let port = &args.port;
-    let user = &args.user;
-    let password = &args.password;
-    let database = &args.database;
     let count = args.count;
     let batch = args.batch;
     let rate = args.rate;
@@ -224,45 +185,7 @@ async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
     } else {
         rate as u32
     };
-
     let begin = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
-    //let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port , database);
-    //println!("{} {}Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), TRUCK, host, port, database, user, table);
-    //let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
-
-    let styles = [
-        ("Rough bar:", "█  ", "red"),
-        ("Fine bar: ", "█▉▊▋▌▍▎▏  ", "yellow"),
-        ("Vertical: ", "█▇▆▅▄▃▂▁  ", "green"),
-        ("Fade in:  ", "█▓▒░  ", "blue"),
-        ("Blocky:   ", "█▛▌▖  ", "magenta"),
-    ];
-
-    /*
-    let m = MultiProgress::new();
-    for s in styles.iter() {
-        let pb = m.add(ProgressBar::new(512));
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", s.2))
-                .progress_chars(s.1),
-        );
-        pb.set_prefix(s.0);
-        let wait = Duration::from_millis(thread_rng().gen_range(10..30));
-        thread::spawn(move || {
-            for i in 0..512 {
-                pb.inc(1);
-                pb.set_message(format!("{:3}%", 100 * i / 512));
-                thread::sleep(wait);
-            }
-            pb.finish_with_message("100%");
-        });
-    }
-
-    m.join().unwrap();
-
-     */
-
     match table.as_str() {
         "t_types_test" => {
             if(count == 0 || batch == 0) {
@@ -283,19 +206,12 @@ async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
                     current_tbl_count
                 );
 
-                let should_final_count = current_tbl_count + count as i64;
+
                 let table_clone = table.clone();
 
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
                 let bar = ProgressBar::new(count as u64);
-                /*
-                bar.set_style(
-                    ProgressStyle::default_bar()
-                        .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", "red"))
-                        .progress_chars("█  "),
-                );
 
-                 */
                 println!("{} {}Inserting...", style("[4/4]").bold().dim(), CLIP);
 
                 for i in 0..round {
