@@ -45,10 +45,10 @@ struct Args {
     #[arg(long, default_value = "t_types_test")]
     table: String,
 
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 1000)]
     count: u32,
 
-    #[arg(short, long, default_value_t = 2)]
+    #[arg(short, long, default_value_t = 1)]
     batch: u32,
 
     #[arg(long, default_value_t = -1)]
@@ -94,11 +94,101 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let action = &args.action;
     println!("{} {}Resolving args...", style("[1/4]").bold().dim(), LOOKING_GLASS);
+    let action = &args.action;
+    let table = &args.table;
+    let host = &args.host;
+    let port = &args.port;
+    let user = &args.user;
+    let password = &args.password;
+    let database = &args.database;
+    let count = args.count;
+
+    let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port, database);
+    println!("{} {}Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), TRUCK, host, port, database, user, table);
+    let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
+
+    let pool_for_insert = pool.clone();
+    let pool_for_count = pool.clone();
+
+    let current_tbl_count = get_table_count(&pool_for_count, "t_types_test").await?;
+    let should_final_count = current_tbl_count + count as i64;
+
+    let insert_thread = tokio::spawn(async move {
+        insert_into(&args, &pool_for_insert).await;
+    });
+
+    /*
+    let count_thread = tokio::spawn(async move {
+        loop {
+            match get_table_count(&pool_for_count, "t_types_test").await {
+                Ok(count) => println!("Current count of table t_types_test: {}", count),
+                Err(e) => eprintln!("Error querying table count: {}", e),
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    });
+
+     */
+
+
+
+
+    let styles = [
+        ("Rough bar:", "█  ", "red"),
+        ("Fine bar: ", "█▉▊▋▌▍▎▏  ", "yellow"),
+        ("Vertical: ", "█▇▆▅▄▃▂▁  ", "green"),
+        ("Fade in:  ", "█▓▒░  ", "blue"),
+        ("Blocky:   ", "█▛▌▖  ", "magenta"),
+    ];
+
+    let m = MultiProgress::new();
+
+    for s in styles.iter() {
+        let pb = m.add(ProgressBar::new(512));
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", s.2))
+                .progress_chars(s.1),
+        );
+        pb.set_prefix(s.0);
+        /*
+        let wait = Duration::from_millis(thread_rng().gen_range(10..30));
+        thread::spawn(move || {
+            for i in 0..512 {
+                pb.inc(1);
+                pb.set_message(format!("{:3}%", 100 * i / 512));
+                thread::sleep(wait);
+            }
+            pb.finish_with_message("100%");
+        });
+
+         */
+
+        loop {
+            match get_table_count(&pool_for_count, "t_types_test").await {
+                Ok(count) => {
+                    println!("Current count of table t_types_test: {}", count);
+                    pb.inc(1);
+                    //pb.set_message(format!("{:3}%", 100 * i / 512)),
+                }
+                Err(e) => eprintln!("Error querying table count: {}", e),
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+    insert_thread.await.unwrap();
+    //count_thread.await.unwrap();
+
+
+    m.join().unwrap();
+
+
+
+    /*
     match action.as_str() {
         "insert" => {
-            let future = insert_into(&args);
+            let future = insert_into(&args, &pool_for_insert);
             future.await?;
         },
 
@@ -109,16 +199,12 @@ async fn main() -> Result<()> {
 
         }
     }
-    //Ok(())
+     */
 
-    loop {
-        sleep(Duration::from_secs(3600));
-    }
+    Ok(())
 }
 
-
-
-async fn insert_into(args: &Args) -> Result<()> {
+async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
     let action = &args.action;
     let table = &args.table;
     let host = &args.host;
@@ -129,7 +215,6 @@ async fn insert_into(args: &Args) -> Result<()> {
     let count = args.count;
     let batch = args.batch;
     let rate = args.rate;
-
     let _batch = if(rate <= 0) {
         if(batch > count) {
             count
@@ -141,9 +226,9 @@ async fn insert_into(args: &Args) -> Result<()> {
     };
 
     let begin = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
-    let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port , database);
-    println!("{} {}Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), TRUCK, host, port, database, user, table);
-    let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
+    //let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port , database);
+    //println!("{} {}Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), TRUCK, host, port, database, user, table);
+    //let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
 
     let styles = [
         ("Rough bar:", "█  ", "red"),
@@ -153,6 +238,7 @@ async fn insert_into(args: &Args) -> Result<()> {
         ("Blocky:   ", "█▛▌▖  ", "magenta"),
     ];
 
+    /*
     let m = MultiProgress::new();
     for s in styles.iter() {
         let pb = m.add(ProgressBar::new(512));
@@ -175,6 +261,8 @@ async fn insert_into(args: &Args) -> Result<()> {
 
     m.join().unwrap();
 
+     */
+
     match table.as_str() {
         "t_types_test" => {
             if(count == 0 || batch == 0) {
@@ -196,20 +284,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                 );
 
                 let should_final_count = current_tbl_count + count as i64;
-
-                let pool_clone = pool.clone();
                 let table_clone = table.clone();
-
-                tokio::spawn(async move {
-                    loop {
-                        match get_table_count(&pool_clone, &table_clone).await {
-                            Ok(count) => println!("Current count: {}", count),
-                            Err(e) => eprintln!("Error querying table count: {}", e),
-                        }
-                        sleep(Duration::from_secs(5));
-                    }
-                });
-
 
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
                 let bar = ProgressBar::new(count as u64);
@@ -284,7 +359,7 @@ async fn insert_into(args: &Args) -> Result<()> {
                     }
                     let query = builder.build();
                     let sql = query.sql();
-                    let _res = query.execute(&pool).await;
+                    let _res = query.execute(pool).await;
                     match _res {
                         Ok(r) => {},
                         Err(e) => {
@@ -302,16 +377,13 @@ async fn insert_into(args: &Args) -> Result<()> {
                 let end = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis();
                 let message = format!("count={}, batch={}, expect_rate={}/s, actual_rate={}/s, begin={}, end={}, cost={}s", count, _batch, rate, (count as f32 / ((end  - begin) as f32) as f32 * 1000.00) as u32 , begin, end, ((end  - begin) as f32 / 1000.00));
                 bar.finish_and_clear();
-
-
-                println!("{} {} in {}", style("[Done]").bold().dim(), SPARKLE, message);
+                println!("{} {} {}", style("[Done]").bold().dim(), SPARKLE, message);
                 Ok(())
             }
         },
         _ => {
             println!("t_types_test");
             Ok(())
-
         }
     }
 
@@ -393,10 +465,26 @@ async fn test() -> Result<()> {
     Ok(())
 }
 
-
+/*
 #[tokio::main]
-async fn main3() {
-    loop {
-        sleep(Duration::from_secs(3600));
-    }
+async fn main5() -> Result<(), Box<dyn Error>> {
+    let pool = Pool::<MySql>::connect("mysql://root:wyx1005@localhost/database_name").await?;
+
+
+    let pool_for_count = pool.clone();
+    tokio::spawn(async move {
+        loop {
+            match get_table_count(&pool_for_count, "t_types_test").await {
+                Ok(count) => println!("Current count: {}", count),
+                Err(e) => eprintln!("Error querying table count: {}", e),
+            }
+            sleep(Duration::from_secs(5)).await;
+        }
+    });
+
+    /// ... 批量插入数据的代码 ...
+
+    Ok(())
 }
+
+ */
