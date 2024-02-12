@@ -15,10 +15,17 @@ use std::time::Duration;
 use std::error::Error;
 use sqlx::QueryBuilder;
 use tokio;
-
+use tokio::sync::Mutex;
+use std::sync::Arc;
 use tokio::{task, time};
 use rand::{thread_rng, Rng};
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
+use dashmap::DashMap;
+use console::Style;
+use reqwest::header::HeaderMap;
+use reqwest::Client;
+use serde::Deserialize;
+
 /// Simple program to delete records in rocket.messages
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -45,7 +52,10 @@ struct Args {
     #[arg(long, default_value = "t_types_test")]
     table: String,
 
-    #[arg(short, long, default_value_t = 1000)]
+    #[arg(long, default_value = "NCMReplicaGroup")]
+    replica_group: String,
+
+    #[arg(short, long, default_value_t = 100)]
     count: u32,
 
     #[arg(short, long, default_value_t = 1)]
@@ -84,6 +94,30 @@ struct AllTypesTest {
 }
 
 
+#[derive(Debug, Deserialize)]
+struct ApiError {
+    code: String,
+    apiName: Option<String>,
+    message: Option<String>
+}
+#[derive(Debug, Deserialize)]
+struct QueryResultCountResponse {
+    dataServerId: String,
+    host: String,
+    port: u32,
+    database: String,
+    query: Option<String>,
+    count: u64,
+    apiError: Option<ApiError>
+
+}
+
+#[derive(Debug, Deserialize)]
+struct CommonMessageResult {
+    status: i32,
+    message: String
+}
+
 static TRUCK: Emoji<'_, '_> = Emoji("🚚  ", "");
 static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "");
 
@@ -91,10 +125,19 @@ static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "");
 static PAPER: Emoji<'_, '_> = Emoji("📃  ", "");
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 
+
+
+static PARAMETERS: Emoji<'_, '_> = Emoji("🛠️️ ", ":-)");
+static DATABASE: Emoji<'_, '_> = Emoji("🗃️ ", ":-)");
+static TABLE: Emoji<'_, '_> = Emoji("📋 ", ":-)");
+static HOST: Emoji<'_, '_> = Emoji("🖥️ ", ":-)");
+
+static PORT: Emoji<'_, '_> = Emoji("🔌 ", ":-)");
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    println!("{} {}Resolving args...", style("[1/4]").bold().dim(), LOOKING_GLASS);
+    println!("{} {} Resolving args...", style("[1/4]").bold().dim(), PARAMETERS);
     let action = &args.action;
     let table = &args.table;
     let host = &args.host;
@@ -102,37 +145,63 @@ async fn main() -> Result<()> {
     let user = &args.user;
     let password = &args.password;
     let database = &args.database;
+    let replica_group = &args.replica_group;
     let count = args.count;
-
-    let url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port, database);
-    println!("{} {}Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), TRUCK, host, port, database, user, table);
-    let pool = MySqlPool::connect(&url).await.expect("Failed to connect to MySQL.");
+    let db_url = format!("mysql://{}:{}@{}:{}/{}", user, password, host, port, database);
+    println!("{} {} Building database connections for host=[{}], port=[{}], database=[{}], user=[{}], table=[{}]", style("[2/4]").bold().dim(), DATABASE, host, port, database, user, table);
+    let pool = MySqlPool::connect(&db_url).await.expect("Failed to connect to MySQL.");
 
     let pool_for_insert = pool.clone();
     let pool_for_count = pool.clone();
 
+    let key = "string";
 
-    //let current_tbl_count = get_table_count(&pool_for_count, "t_types_test").await?;
-    //let should_final_count = current_tbl_count + count as i64;
+    let current_tbl_count = get_table_count(&pool_for_count, "t_types_test").await?;
+    let should_final_count = current_tbl_count as u64 + count as u64;
 
 
-    let insert_thread = tokio::spawn(async move {
-        insert_into(&args, &pool_for_insert).await;
-    });
+    let blue = Style::new().blue();
+    let green = Style::new().green();
 
-    /*
-    let count_thread = tokio::spawn(async move {
+    println!("{} {} Current {} record count = {}, final count = {}", style("[3/4]").bold().dim(), TABLE, table, blue.apply_to(current_tbl_count), green.apply_to(should_final_count));
+
+    let map: Arc<DashMap<String, u64>> = Arc::new(DashMap::new());
+    let map_for_write = map.clone();
+
+    let client = create_client().await.unwrap(); //Client::builder().danger_accept_invalid_certs(true).build()?;
+
+    let url = "http://127.0.0.1:18090/data/sync/table/NCMReplicaGroup/t_types_test";
+
+
+    let client_for_count = client.clone();
+
+    let get_count_thread = tokio::spawn(async move {
         loop {
-            match get_table_count(&pool_for_count, "t_types_test").await {
-                Ok(count) => println!("Current count of table t_types_test: {}", count),
-                Err(e) => eprintln!("Error querying table count: {}", e),
+            match client_for_count.get(url).send().await {
+                Ok(rep) => {
+                    match rep.json::<Vec<QueryResultCountResponse>>().await {
+                        Ok(res) => {
+                            for r in &res {
+                                map_for_write.insert(r.dataServerId.to_string(), r.count);
+                            }
+                        },
+                        Err(e) => println!("error = {}", e.to_string())
+
+                    }
+                },
+                Err(e) => {
+                    println!("Exception = {}", e.to_string())
+                }
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
     });
 
-     */
 
+
+    let peers = get_servers(&client, &url).await;
+    let mut vec = Vec::<(String, String, String)>::new();
+    let mut vec_1 = Vec::<(&str, &str, &str)>::new();
 
     let styles = [
         ("Rough bar:", "█  ", "red"),
@@ -142,14 +211,72 @@ async fn main() -> Result<()> {
         ("Blocky:   ", "█▛▌▖  ", "magenta"),
     ];
 
+    let progress = for (index, r)  in peers.iter().enumerate() {
+        let _key_1 = format!("{}:{}", r.host, r.port);
+        let _key_2 = format!("{}:{}", r.host, r.port);
+        //let _key_3 = format!("{}:{}", r.host, r.port).as_str();
+        vec.push((_key_1, styles.get(index % 5).unwrap_or(&(_key_2.as_str(), "█  ", "red")).2.to_string(), "".to_string()));
+        //vec_1.push((_key_3, _key_3, _key_3));
+    };
+
     let m = MultiProgress::new();
 
+
+
+    /*
+    for i in &vec {
+        println!("元素1: {}, 元素2: {}, 元素3: {}", i.0, i.1, i.2);
+    }
+     */
+
+
+
+
+    /*
+
+    for s in styles.iter()
+    {
+        //let s = styles.get(3).unwrap();
+        let pb = m.add(ProgressBar::new(should_final_count));
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", s.2))
+                .progress_chars(s.1),
+        );
+        pb.set_prefix(s.0);
+        let count_map = map.clone();
+        let h = tokio::spawn(async move {
+            loop {
+                match count_map.get(key) {
+                    Some(count_ref) => {
+                        let count = *count_ref;
+                        if(count >= should_final_count) {
+                            break;
+                        } else {
+                            pb.inc(count);
+                            pb.set_message(format!("{}/{}", count, should_final_count));
+                        }
+                    }
+                    None => {},
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+            pb.finish_with_message(format!("{}/{}", should_final_count, should_final_count));
+        });
+        //h.await.unwrap();
+    }
+
+     */
+
+    let insert_thread = tokio::spawn(async move {
+        insert_into(&args, &pool_for_insert).await;
+    });
+
     insert_thread.await.unwrap();
-    //count_thread.await.unwrap();
 
-
-    //m.join().unwrap();
-
+    let bar = ProgressBar::new(count as u64);
+    m.add(bar);
+    m.join().unwrap();
 
 
     /*
@@ -171,6 +298,35 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+
+async fn get_servers(client: &Client, url: &str) -> Vec<QueryResultCountResponse> {
+    match client.get(url).send().await {
+        Ok(rep) => {
+            match rep.json::<Vec<QueryResultCountResponse>>().await {
+                Ok(res) => {
+                    res
+                },
+                Err(e) => {
+                    println!("error = {}", e.to_string());
+                    Vec::<QueryResultCountResponse>::new()
+                }
+
+            }
+        },
+        Err(e) => {
+            println!("Exception = {}", e.to_string());
+            Vec::<QueryResultCountResponse>::new()
+        }
+    }
+}
+
+async fn create_client() -> std::result::Result<Client, reqwest::Error> {
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()?;
+
+    Ok(client)
+}
 async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
     let table = &args.table;
     let count = args.count;
@@ -199,20 +355,13 @@ async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
                     }
                 };
 
-                println!(
-                    "{} {}Retrieving current count: {}",
-                    style("[3/4]").bold().dim(),
-                    PAPER,
-                    current_tbl_count
-                );
-
-
                 let table_clone = table.clone();
-
                 let round = if(count % _batch == 0) {count / _batch} else {count / _batch + 1};
-                let bar = ProgressBar::new(count as u64);
+                let _style = ProgressStyle::default_bar()
+                    .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", "red"))
+                    .progress_chars("Inserting");
 
-                println!("{} {}Inserting...", style("[4/4]").bold().dim(), CLIP);
+                let bar = ProgressBar::new(count as u64);
 
                 for i in 0..round {
                     let mut builder = QueryBuilder::new("INSERT INTO t_types_test(id1, id2, id3, gender, bool_1, bit_1, int_tiny, int_small, int_medium, int_int, int_big, pay1, pay2, pay3, latest_year, latest_date, latest_time, latest_datetime, latest_timestamp, blob_tiny, blob_blob, blob_medium, text1, long_text) VALUES ");
@@ -302,13 +451,12 @@ async fn insert_into(args: &Args, pool: &Pool<MySql>) -> Result<()> {
             Ok(())
         }
     }
-
 }
 
-async fn get_table_count(pool: &Pool<MySql>, table_name: &str) -> Result<i64, sqlx::Error> {
+async fn get_table_count(pool: &Pool<MySql>, table_name: &str) -> Result<u64, sqlx::Error> {
     let query = format!("SELECT COUNT(*) FROM {}", table_name);
     let count: i64 = sqlx::query_scalar(&query).fetch_one(pool).await?;
-    Ok(count)
+    Ok(count as u64)
 }
 fn load_dir(dir: &str) -> Result<Vec<String>> {
     let mut files = Vec::new();
@@ -352,29 +500,7 @@ async fn execute_batch_delete(id_file: &str, pool: &Pool<MySql>) -> Result<()> {
 }
 
 
-async fn execute_batch_insert(id_file: &str, pool: &Pool<MySql>) -> Result<()> {
-    let contents = fs::read_to_string(id_file)?;
-    let ids: Vec<String> = contents.lines().map(|id|format!("'{}'", id)).collect();
-    let query = format!(
-        "DELETE FROM messages WHERE id IN ({})",
-        ids.join(", ")
-    );
-    sqlx::query(&query).execute(pool).await?;
-    Ok(())
-}
 
-
-
-#[tokio::main]
-async fn main2() -> Result<()> {
-    let v1 = test();
-    let v2 =  test();
-    println!("main");
-    tokio::join!(v1, v2);
-    //sleep(Duration::from_secs(1));
-    //tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    Ok(())
-}
 async fn test() -> Result<()> {
     println!("Hello world!");
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
