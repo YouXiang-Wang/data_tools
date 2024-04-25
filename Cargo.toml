@@ -18,9 +18,16 @@ time = "0.3.32"
 dashmap = "5.5.3"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 serde = {version = "1.0.144", features = ["derive"]}
+conv = "0.3.3"
+log = "0.4.21"
+sonyflake = "0.2"
+rs-snowflake = "*"
 
 [dependencies.sqlx]
-version = "0.6"
+version = "0.7.4"
 default-features = false
 features = ["runtime-tokio-rustls", "macros", "mysql"]
 
+[dependencies.openssl]
+version = "0.10"
+features = ["vendored"]
